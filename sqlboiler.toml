@@ -1,0 +1,16 @@
+pkgname = "models"
+output = "database/models"
+debug = false
+add-global-variants = false
+add-panic-variants = false
+add-soft-deletes = true
+no-context = true
+no-hooks = true
+
+[psql]
+user = "johan"
+host = "localhost"
+port = 5432
+dbname = "oikotie"
+sslmode = "disable"
+pass = "password"
