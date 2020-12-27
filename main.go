@@ -1,19 +1,28 @@
 package main
 
-import "fmt"
-import "oikotie/scraper"
-import "database/sql"
-import "log"
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"oikotie/config"
+	"oikotie/scraper"
+)
 
 func main() {
-	db, err := sql.Open("postgres", "postgres://johan:password@localhost:5432/oikotie?sslmode=disable")
-    if err != nil {
-        log.Fatal(err)
-    }
+	cfg, err := config.NewReader()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db, err := sql.Open("postgres", cfg.DatabaseURL())
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	search := scraper.CreateSearch(db).SetAreaCodes([]string{"00200", "00340"})
 	res, err := search.Run()
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println(res)
 }
