@@ -4,8 +4,10 @@ debug = false
 add-global-variants = false
 add-panic-variants = false
 add-soft-deletes = true
+no-tests = true
 no-context = true
 no-hooks = true
+wipe = true
 
 [psql]
 user = "johan"

@@ -22,7 +22,7 @@ import (
 
 // Area is an object representing the database table.
 type Area struct {
-	AreaID   int    `boil:"area_id" json:"area_id" toml:"area_id" yaml:"area_id"`
+	ID       int    `boil:"id" json:"id" toml:"id" yaml:"id"`
 	Name     string `boil:"name" json:"name" toml:"name" yaml:"name"`
 	City     string `boil:"city" json:"city" toml:"city" yaml:"city"`
 	CardType int    `boil:"card_type" json:"card_type" toml:"card_type" yaml:"card_type"`
@@ -32,12 +32,12 @@ type Area struct {
 }
 
 var AreaColumns = struct {
-	AreaID   string
+	ID       string
 	Name     string
 	City     string
 	CardType string
 }{
-	AreaID:   "area_id",
+	ID:       "id",
 	Name:     "name",
 	City:     "city",
 	CardType: "card_type",
@@ -92,12 +92,12 @@ func (w whereHelperstring) NIN(slice []string) qm.QueryMod {
 }
 
 var AreaWhere = struct {
-	AreaID   whereHelperint
+	ID       whereHelperint
 	Name     whereHelperstring
 	City     whereHelperstring
 	CardType whereHelperint
 }{
-	AreaID:   whereHelperint{field: "\"areas\".\"area_id\""},
+	ID:       whereHelperint{field: "\"areas\".\"id\""},
 	Name:     whereHelperstring{field: "\"areas\".\"name\""},
 	City:     whereHelperstring{field: "\"areas\".\"city\""},
 	CardType: whereHelperint{field: "\"areas\".\"card_type\""},
@@ -124,10 +124,10 @@ func (*areaR) NewStruct() *areaR {
 type areaL struct{}
 
 var (
-	areaAllColumns            = []string{"area_id", "name", "city", "card_type"}
-	areaColumnsWithoutDefault = []string{"area_id", "name", "city", "card_type"}
+	areaAllColumns            = []string{"id", "name", "city", "card_type"}
+	areaColumnsWithoutDefault = []string{"id", "name", "city", "card_type"}
 	areaColumnsWithDefault    = []string{}
-	areaPrimaryKeyColumns     = []string{"area_id"}
+	areaPrimaryKeyColumns     = []string{"id"}
 )
 
 type (
@@ -229,7 +229,7 @@ func (o *Area) Listings(mods ...qm.QueryMod) listingQuery {
 	}
 
 	queryMods = append(queryMods,
-		qm.Where("\"listings\".\"area_id\"=?", o.AreaID),
+		qm.Where("\"listings\".\"area_id\"=?", o.ID),
 	)
 
 	query := Listings(queryMods...)
@@ -259,7 +259,7 @@ func (areaL) LoadListings(e boil.Executor, singular bool, maybeArea interface{},
 		if object.R == nil {
 			object.R = &areaR{}
 		}
-		args = append(args, object.AreaID)
+		args = append(args, object.ID)
 	} else {
 	Outer:
 		for _, obj := range slice {
@@ -268,12 +268,12 @@ func (areaL) LoadListings(e boil.Executor, singular bool, maybeArea interface{},
 			}
 
 			for _, a := range args {
-				if queries.Equal(a, obj.AreaID) {
+				if a == obj.ID {
 					continue Outer
 				}
 			}
 
-			args = append(args, obj.AreaID)
+			args = append(args, obj.ID)
 		}
 	}
 
@@ -319,7 +319,7 @@ func (areaL) LoadListings(e boil.Executor, singular bool, maybeArea interface{},
 
 	for _, foreign := range resultSlice {
 		for _, local := range slice {
-			if queries.Equal(local.AreaID, foreign.AreaID) {
+			if local.ID == foreign.AreaID {
 				local.R.Listings = append(local.R.Listings, foreign)
 				if foreign.R == nil {
 					foreign.R = &listingR{}
@@ -341,7 +341,7 @@ func (o *Area) AddListings(exec boil.Executor, insert bool, related ...*Listing)
 	var err error
 	for _, rel := range related {
 		if insert {
-			queries.Assign(&rel.AreaID, o.AreaID)
+			rel.AreaID = o.ID
 			if err = rel.Insert(exec, boil.Infer()); err != nil {
 				return errors.Wrap(err, "failed to insert into foreign table")
 			}
@@ -351,7 +351,7 @@ func (o *Area) AddListings(exec boil.Executor, insert bool, related ...*Listing)
 				strmangle.SetParamNames("\"", "\"", 1, []string{"area_id"}),
 				strmangle.WhereClause("\"", "\"", 2, listingPrimaryKeyColumns),
 			)
-			values := []interface{}{o.AreaID, rel.ID}
+			values := []interface{}{o.ID, rel.ID}
 
 			if boil.DebugMode {
 				fmt.Fprintln(boil.DebugWriter, updateQuery)
@@ -361,7 +361,7 @@ func (o *Area) AddListings(exec boil.Executor, insert bool, related ...*Listing)
 				return errors.Wrap(err, "failed to update foreign table")
 			}
 
-			queries.Assign(&rel.AreaID, o.AreaID)
+			rel.AreaID = o.ID
 		}
 	}
 
@@ -385,75 +385,6 @@ func (o *Area) AddListings(exec boil.Executor, insert bool, related ...*Listing)
 	return nil
 }
 
-// SetListings removes all previously related items of the
-// area replacing them completely with the passed
-// in related items, optionally inserting them as new records.
-// Sets o.R.Area's Listings accordingly.
-// Replaces o.R.Listings with related.
-// Sets related.R.Area's Listings accordingly.
-func (o *Area) SetListings(exec boil.Executor, insert bool, related ...*Listing) error {
-	query := "update \"listings\" set \"area_id\" = null where \"area_id\" = $1"
-	values := []interface{}{o.AreaID}
-	if boil.DebugMode {
-		fmt.Fprintln(boil.DebugWriter, query)
-		fmt.Fprintln(boil.DebugWriter, values)
-	}
-	_, err := exec.Exec(query, values...)
-	if err != nil {
-		return errors.Wrap(err, "failed to remove relationships before set")
-	}
-
-	if o.R != nil {
-		for _, rel := range o.R.Listings {
-			queries.SetScanner(&rel.AreaID, nil)
-			if rel.R == nil {
-				continue
-			}
-
-			rel.R.Area = nil
-		}
-
-		o.R.Listings = nil
-	}
-	return o.AddListings(exec, insert, related...)
-}
-
-// RemoveListings relationships from objects passed in.
-// Removes related items from R.Listings (uses pointer comparison, removal does not keep order)
-// Sets related.R.Area.
-func (o *Area) RemoveListings(exec boil.Executor, related ...*Listing) error {
-	var err error
-	for _, rel := range related {
-		queries.SetScanner(&rel.AreaID, nil)
-		if rel.R != nil {
-			rel.R.Area = nil
-		}
-		if _, err = rel.Update(exec, boil.Whitelist("area_id")); err != nil {
-			return err
-		}
-	}
-	if o.R == nil {
-		return nil
-	}
-
-	for _, rel := range related {
-		for i, ri := range o.R.Listings {
-			if rel != ri {
-				continue
-			}
-
-			ln := len(o.R.Listings)
-			if ln > 1 && i < ln-1 {
-				o.R.Listings[i] = o.R.Listings[ln-1]
-			}
-			o.R.Listings = o.R.Listings[:ln-1]
-			break
-		}
-	}
-
-	return nil
-}
-
 // Areas retrieves all the records using an executor.
 func Areas(mods ...qm.QueryMod) areaQuery {
 	mods = append(mods, qm.From("\"areas\""))
@@ -462,7 +393,7 @@ func Areas(mods ...qm.QueryMod) areaQuery {
 
 // FindArea retrieves a single record by ID with an executor.
 // If selectCols is empty Find will return all columns.
-func FindArea(exec boil.Executor, areaID int, selectCols ...string) (*Area, error) {
+func FindArea(exec boil.Executor, iD int, selectCols ...string) (*Area, error) {
 	areaObj := &Area{}
 
 	sel := "*"
@@ -470,10 +401,10 @@ func FindArea(exec boil.Executor, areaID int, selectCols ...string) (*Area, erro
 		sel = strings.Join(strmangle.IdentQuoteSlice(dialect.LQ, dialect.RQ, selectCols), ",")
 	}
 	query := fmt.Sprintf(
-		"select %s from \"areas\" where \"area_id\"=$1", sel,
+		"select %s from \"areas\" where \"id\"=$1", sel,
 	)
 
-	q := queries.Raw(query, areaID)
+	q := queries.Raw(query, iD)
 
 	err := q.Bind(nil, exec, areaObj)
 	if err != nil {
@@ -801,7 +732,7 @@ func (o *Area) Delete(exec boil.Executor) (int64, error) {
 	}
 
 	args := queries.ValuesFromMapping(reflect.Indirect(reflect.ValueOf(o)), areaPrimaryKeyMapping)
-	sql := "DELETE FROM \"areas\" WHERE \"area_id\"=$1"
+	sql := "DELETE FROM \"areas\" WHERE \"id\"=$1"
 
 	if boil.DebugMode {
 		fmt.Fprintln(boil.DebugWriter, sql)
@@ -876,7 +807,7 @@ func (o AreaSlice) DeleteAll(exec boil.Executor) (int64, error) {
 // Reload refetches the object from the database
 // using the primary keys with an executor.
 func (o *Area) Reload(exec boil.Executor) error {
-	ret, err := FindArea(exec, o.AreaID)
+	ret, err := FindArea(exec, o.ID)
 	if err != nil {
 		return err
 	}
@@ -915,15 +846,15 @@ func (o *AreaSlice) ReloadAll(exec boil.Executor) error {
 }
 
 // AreaExists checks if the Area row exists.
-func AreaExists(exec boil.Executor, areaID int) (bool, error) {
+func AreaExists(exec boil.Executor, iD int) (bool, error) {
 	var exists bool
-	sql := "select exists(select 1 from \"areas\" where \"area_id\"=$1 limit 1)"
+	sql := "select exists(select 1 from \"areas\" where \"id\"=$1 limit 1)"
 
 	if boil.DebugMode {
 		fmt.Fprintln(boil.DebugWriter, sql)
-		fmt.Fprintln(boil.DebugWriter, areaID)
+		fmt.Fprintln(boil.DebugWriter, iD)
 	}
-	row := exec.QueryRow(sql, areaID)
+	row := exec.QueryRow(sql, iD)
 
 	err := row.Scan(&exists)
 	if err != nil {

@@ -11,3 +11,5 @@ clean:
 	rm -rf bin/*
 migrate: build
 	migrate -database "postgres://johan:password@localhost:5432/oikotie?sslmode=disable" -path migrations up
+generate:
+	go generate ./... && sqlboiler psql

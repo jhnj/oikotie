@@ -24,8 +24,8 @@ import (
 // Listing is an object representing the database table.
 type Listing struct {
 	ID             int       `boil:"id" json:"id" toml:"id" yaml:"id"`
-	AreaID         null.Int  `boil:"area_id" json:"area_id,omitempty" toml:"area_id" yaml:"area_id,omitempty"`
-	Price          null.Int  `boil:"price" json:"price,omitempty" toml:"price" yaml:"price,omitempty"`
+	AreaID         int       `boil:"area_id" json:"area_id" toml:"area_id" yaml:"area_id"`
+	Price          int       `boil:"price" json:"price" toml:"price" yaml:"price"`
 	ListingData    null.JSON `boil:"listing_data" json:"listing_data,omitempty" toml:"listing_data" yaml:"listing_data,omitempty"`
 	ListingDetails null.JSON `boil:"listing_details" json:"listing_details,omitempty" toml:"listing_details" yaml:"listing_details,omitempty"`
 	DateAccessed   time.Time `boil:"date_accessed" json:"date_accessed" toml:"date_accessed" yaml:"date_accessed"`
@@ -51,29 +51,6 @@ var ListingColumns = struct {
 }
 
 // Generated where
-
-type whereHelpernull_Int struct{ field string }
-
-func (w whereHelpernull_Int) EQ(x null.Int) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_Int) NEQ(x null.Int) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_Int) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_Int) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
-func (w whereHelpernull_Int) LT(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_Int) LTE(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_Int) GT(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_Int) GTE(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
 
 type whereHelpernull_JSON struct{ field string }
 
@@ -121,15 +98,15 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 
 var ListingWhere = struct {
 	ID             whereHelperint
-	AreaID         whereHelpernull_Int
-	Price          whereHelpernull_Int
+	AreaID         whereHelperint
+	Price          whereHelperint
 	ListingData    whereHelpernull_JSON
 	ListingDetails whereHelpernull_JSON
 	DateAccessed   whereHelpertime_Time
 }{
 	ID:             whereHelperint{field: "\"listings\".\"id\""},
-	AreaID:         whereHelpernull_Int{field: "\"listings\".\"area_id\""},
-	Price:          whereHelpernull_Int{field: "\"listings\".\"price\""},
+	AreaID:         whereHelperint{field: "\"listings\".\"area_id\""},
+	Price:          whereHelperint{field: "\"listings\".\"price\""},
 	ListingData:    whereHelpernull_JSON{field: "\"listings\".\"listing_data\""},
 	ListingDetails: whereHelpernull_JSON{field: "\"listings\".\"listing_details\""},
 	DateAccessed:   whereHelpertime_Time{field: "\"listings\".\"date_accessed\""},
@@ -256,7 +233,7 @@ func (q listingQuery) Exists(exec boil.Executor) (bool, error) {
 // Area pointed to by the foreign key.
 func (o *Listing) Area(mods ...qm.QueryMod) areaQuery {
 	queryMods := []qm.QueryMod{
-		qm.Where("\"area_id\" = ?", o.AreaID),
+		qm.Where("\"id\" = ?", o.AreaID),
 	}
 
 	queryMods = append(queryMods, mods...)
@@ -284,9 +261,7 @@ func (listingL) LoadArea(e boil.Executor, singular bool, maybeListing interface{
 		if object.R == nil {
 			object.R = &listingR{}
 		}
-		if !queries.IsNil(object.AreaID) {
-			args = append(args, object.AreaID)
-		}
+		args = append(args, object.AreaID)
 
 	} else {
 	Outer:
@@ -296,14 +271,12 @@ func (listingL) LoadArea(e boil.Executor, singular bool, maybeListing interface{
 			}
 
 			for _, a := range args {
-				if queries.Equal(a, obj.AreaID) {
+				if a == obj.AreaID {
 					continue Outer
 				}
 			}
 
-			if !queries.IsNil(obj.AreaID) {
-				args = append(args, obj.AreaID)
-			}
+			args = append(args, obj.AreaID)
 
 		}
 	}
@@ -314,7 +287,7 @@ func (listingL) LoadArea(e boil.Executor, singular bool, maybeListing interface{
 
 	query := NewQuery(
 		qm.From(`areas`),
-		qm.WhereIn(`areas.area_id in ?`, args...),
+		qm.WhereIn(`areas.id in ?`, args...),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -353,7 +326,7 @@ func (listingL) LoadArea(e boil.Executor, singular bool, maybeListing interface{
 
 	for _, local := range slice {
 		for _, foreign := range resultSlice {
-			if queries.Equal(local.AreaID, foreign.AreaID) {
+			if local.AreaID == foreign.ID {
 				local.R.Area = foreign
 				if foreign.R == nil {
 					foreign.R = &areaR{}
@@ -383,7 +356,7 @@ func (o *Listing) SetArea(exec boil.Executor, insert bool, related *Area) error 
 		strmangle.SetParamNames("\"", "\"", 1, []string{"area_id"}),
 		strmangle.WhereClause("\"", "\"", 2, listingPrimaryKeyColumns),
 	)
-	values := []interface{}{related.AreaID, o.ID}
+	values := []interface{}{related.ID, o.ID}
 
 	if boil.DebugMode {
 		fmt.Fprintln(boil.DebugWriter, updateQuery)
@@ -393,7 +366,7 @@ func (o *Listing) SetArea(exec boil.Executor, insert bool, related *Area) error 
 		return errors.Wrap(err, "failed to update local table")
 	}
 
-	queries.Assign(&o.AreaID, related.AreaID)
+	o.AreaID = related.ID
 	if o.R == nil {
 		o.R = &listingR{
 			Area: related,
@@ -410,39 +383,6 @@ func (o *Listing) SetArea(exec boil.Executor, insert bool, related *Area) error 
 		related.R.Listings = append(related.R.Listings, o)
 	}
 
-	return nil
-}
-
-// RemoveArea relationship.
-// Sets o.R.Area to nil.
-// Removes o from all passed in related items' relationships struct (Optional).
-func (o *Listing) RemoveArea(exec boil.Executor, related *Area) error {
-	var err error
-
-	queries.SetScanner(&o.AreaID, nil)
-	if _, err = o.Update(exec, boil.Whitelist("area_id")); err != nil {
-		return errors.Wrap(err, "failed to update local table")
-	}
-
-	if o.R != nil {
-		o.R.Area = nil
-	}
-	if related == nil || related.R == nil {
-		return nil
-	}
-
-	for i, ri := range related.R.Listings {
-		if queries.Equal(o.AreaID, ri.AreaID) {
-			continue
-		}
-
-		ln := len(related.R.Listings)
-		if ln > 1 && i < ln-1 {
-			related.R.Listings[i] = related.R.Listings[ln-1]
-		}
-		related.R.Listings = related.R.Listings[:ln-1]
-		break
-	}
 	return nil
 }
 
