@@ -24,6 +24,8 @@ import (
 // Listing is an object representing the database table.
 type Listing struct {
 	ID             int       `boil:"id" json:"id" toml:"id" yaml:"id"`
+	CreatedAt      null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	ExternalID     int       `boil:"external_id" json:"external_id" toml:"external_id" yaml:"external_id"`
 	AreaID         int       `boil:"area_id" json:"area_id" toml:"area_id" yaml:"area_id"`
 	Price          int       `boil:"price" json:"price" toml:"price" yaml:"price"`
 	ListingData    null.JSON `boil:"listing_data" json:"listing_data,omitempty" toml:"listing_data" yaml:"listing_data,omitempty"`
@@ -36,6 +38,8 @@ type Listing struct {
 
 var ListingColumns = struct {
 	ID             string
+	CreatedAt      string
+	ExternalID     string
 	AreaID         string
 	Price          string
 	ListingData    string
@@ -43,6 +47,8 @@ var ListingColumns = struct {
 	DateAccessed   string
 }{
 	ID:             "id",
+	CreatedAt:      "created_at",
+	ExternalID:     "external_id",
 	AreaID:         "area_id",
 	Price:          "price",
 	ListingData:    "listing_data",
@@ -51,6 +57,29 @@ var ListingColumns = struct {
 }
 
 // Generated where
+
+type whereHelpernull_Time struct{ field string }
+
+func (w whereHelpernull_Time) EQ(x null.Time) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, false, x)
+}
+func (w whereHelpernull_Time) NEQ(x null.Time) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, true, x)
+}
+func (w whereHelpernull_Time) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
+func (w whereHelpernull_Time) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
+func (w whereHelpernull_Time) LT(x null.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpernull_Time) LTE(x null.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpernull_Time) GT(x null.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpernull_Time) GTE(x null.Time) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
 
 type whereHelpernull_JSON struct{ field string }
 
@@ -98,6 +127,8 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 
 var ListingWhere = struct {
 	ID             whereHelperint
+	CreatedAt      whereHelpernull_Time
+	ExternalID     whereHelperint
 	AreaID         whereHelperint
 	Price          whereHelperint
 	ListingData    whereHelpernull_JSON
@@ -105,6 +136,8 @@ var ListingWhere = struct {
 	DateAccessed   whereHelpertime_Time
 }{
 	ID:             whereHelperint{field: "\"listings\".\"id\""},
+	CreatedAt:      whereHelpernull_Time{field: "\"listings\".\"created_at\""},
+	ExternalID:     whereHelperint{field: "\"listings\".\"external_id\""},
 	AreaID:         whereHelperint{field: "\"listings\".\"area_id\""},
 	Price:          whereHelperint{field: "\"listings\".\"price\""},
 	ListingData:    whereHelpernull_JSON{field: "\"listings\".\"listing_data\""},
@@ -133,9 +166,9 @@ func (*listingR) NewStruct() *listingR {
 type listingL struct{}
 
 var (
-	listingAllColumns            = []string{"id", "area_id", "price", "listing_data", "listing_details", "date_accessed"}
-	listingColumnsWithoutDefault = []string{"area_id", "price", "listing_data", "listing_details"}
-	listingColumnsWithDefault    = []string{"id", "date_accessed"}
+	listingAllColumns            = []string{"id", "created_at", "external_id", "area_id", "price", "listing_data", "listing_details", "date_accessed"}
+	listingColumnsWithoutDefault = []string{"external_id", "area_id", "price", "listing_data", "listing_details"}
+	listingColumnsWithDefault    = []string{"id", "created_at", "date_accessed"}
 	listingPrimaryKeyColumns     = []string{"id"}
 )
 
@@ -426,6 +459,11 @@ func (o *Listing) Insert(exec boil.Executor, columns boil.Columns) error {
 	}
 
 	var err error
+	currTime := time.Now().In(boil.GetLocation())
+
+	if queries.MustTime(o.CreatedAt).IsZero() {
+		queries.SetScanner(&o.CreatedAt, currTime)
+	}
 
 	nzDefaults := queries.NonZeroDefaultSet(listingColumnsWithDefault, o)
 
@@ -620,6 +658,11 @@ func (o ListingSlice) UpdateAll(exec boil.Executor, cols M) (int64, error) {
 func (o *Listing) Upsert(exec boil.Executor, updateOnConflict bool, conflictColumns []string, updateColumns, insertColumns boil.Columns) error {
 	if o == nil {
 		return errors.New("models: no listings provided for upsert")
+	}
+	currTime := time.Now().In(boil.GetLocation())
+
+	if queries.MustTime(o.CreatedAt).IsZero() {
+		queries.SetScanner(&o.CreatedAt, currTime)
 	}
 
 	nzDefaults := queries.NonZeroDefaultSet(listingColumnsWithDefault, o)
