@@ -12,9 +12,10 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	_ "github.com/lib/pq"
-	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 )
+
+const cardsURL = "https://asunnot.oikotie.fi/api/cards"
 
 type requestParams struct {
 	token   string
@@ -34,7 +35,7 @@ type ApiArea struct {
 	} `json:"parent"`
 }
 
-type searchOptions struct {
+type scraperOptions struct {
 	MaxPrice  int
 	MinPrice  int
 	MaxSize   int
@@ -42,148 +43,68 @@ type searchOptions struct {
 	AreaCodes []string
 }
 
-type Search struct {
-	Options       searchOptions
-	DB            *sql.DB
+type Scraper struct {
+	options       scraperOptions
+	db            *sql.DB
 	requestParams *requestParams
+	client        *http.Client
 }
 
-// CreateSearch Initialize with default values
-func CreateSearch(db *sql.DB) *Search {
-	search := &Search{
-		Options: searchOptions{
+// Create Initialize with default values
+func Create(db *sql.DB) *Scraper {
+	search := &Scraper{
+		options: scraperOptions{
 			MaxPrice:  800000,
 			MinPrice:  1,
 			MaxSize:   100,
 			MinSize:   1,
 			AreaCodes: []string{"00200"},
 		},
-		DB: db,
+		db:     db,
+		client: &http.Client{},
 	}
 
 	return search
 }
 
-func (s *Search) SetAreaCodes(areaCodes []string) *Search {
-	s.Options.AreaCodes = areaCodes
+func (s *Scraper) SetAreaCodes(areaCodes []string) *Scraper {
+	s.options.AreaCodes = areaCodes
 	return s
 }
 
-func (s *Search) SetPrice(min int, max int) *Search {
-	s.Options.MinPrice = min
-	s.Options.MaxPrice = max
+func (s *Scraper) SetPrice(min int, max int) *Scraper {
+	s.options.MinPrice = min
+	s.options.MaxPrice = max
 	return s
 }
 
-func (s *Search) SetSize(min int, max int) *Search {
-	s.Options.MinSize = min
-	s.Options.MaxSize = max
+func (s *Scraper) SetSize(min int, max int) *Scraper {
+	s.options.MinSize = min
+	s.options.MaxSize = max
 	return s
 }
 
-func (s *Search) Run() (interface{}, error) {
+func (s *Scraper) Run() (interface{}, error) {
 	params, err := getRequestParams()
 	if err != nil {
 		return "", err
 	}
 	s.requestParams = &params
 
-	areas, err := s.getAreas(s.Options.AreaCodes)
+	areas, err := s.getAreas(s.options.AreaCodes)
 	if err != nil {
 		return "", err
 	}
 
-	client := &http.Client{}
-	url := "https://asunnot.oikotie.fi/api/cards"
-
 	for _, area := range areas {
-		req, _ := http.NewRequest("GET", url, nil)
-		req.Header.Set("ota-token", params.token)
-		req.Header.Set("ota-cuid", params.cuid)
-		req.Header.Set("ota-loaded", params.loaded)
-		for _, cookie := range params.cookies {
-			req.AddCookie(cookie)
-		}
-
-		q := req.URL.Query()
-		q.Add("buildingType[]", "1") // Kerrostalo
-		q.Add("buildingType[]", "256")
-		q.Add("cardType", "100")      // Not sure
-		q.Add("conditionType[]", "1") // Erinomainen, Hyvä, Tyydyttävä, Välttävä, Huono
-		q.Add("conditionType[]", "2")
-		q.Add("conditionType[]", "4")
-		q.Add("conditionType[]", "8")
-		q.Add("conditionType[]", "16")
-		// areaStrings := make([]string, len(areas))
-		// for i, a := range areas {
-		// 	areaStrings[i] = fmt.Sprintf("[%d,%d,\"%s, Helsinki\"]", a.AreaID, a.CardType, a.Name)
-		// }
-		// q.Add("locations", fmt.Sprintf("[%s]", strings.Join(areaStrings, ",")))
-		q.Add("locations", fmt.Sprintf("[[%d, %d,\"%s, %s\"]]", area.ID, area.CardType, area.Name, area.City))
-
-		q.Add("lotOwnershipType[]", "1") // Oma, Vuokralla, Valinnainen vuokratontti
-		q.Add("lotOwnershipType[]", "2")
-		q.Add("lotOwnershipType[]", "3")
-		q.Add("price[max]", strconv.Itoa(s.Options.MaxPrice))
-		q.Add("price[min]", strconv.Itoa(s.Options.MinPrice))
-		q.Add("size[max]", strconv.Itoa(s.Options.MaxSize))
-		q.Add("size[min]", strconv.Itoa(s.Options.MinSize))
-		q.Add("sortBy", "published_sort_desc")
-		q.Add("limit", "1")
-		req.URL.RawQuery = q.Encode()
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		var listings struct {
-			Cards []map[string]interface{} `json:"cards"`
-		}
-		err = json.NewDecoder(resp.Body).Decode(&listings)
-		if err != nil {
-			return nil, err
-		}
-
-		reg, err := regexp.Compile("[^0-9]+")
-		if err != nil {
-			return "", err
-		}
-		for _, apiListing := range listings.Cards {
-			price, err := strconv.Atoi(reg.ReplaceAllString(apiListing["price"].(string), ""))
-			if err != nil {
-				return "", err
-			}
-
-			listingDataJSON := null.JSON{}
-			listingDataJSON.Marshal(apiListing)
-			listing := models.Listing{
-				ID:          int(apiListing["id"].(float64)),
-				Price:       price,
-				ListingData: listingDataJSON,
-			}
-			// check
-			listing.SetArea(s.DB, false, area)
-
-			listingDetailsJSON := null.JSON{}
-			listingDetails, err := s.getListingDetails(listing)
-			if err != nil {
-				return "", err
-			}
-			fmt.Println(listingDetails)
-			listingDetailsJSON.Marshal(listingDetails)
-			listing.ListingDetails = listingDetailsJSON
-			fmt.Println(string(listingDetailsJSON.JSON))
-
-			listing.Insert(s.DB, boil.Infer())
-		}
+		s.getListings(area)
 	}
 
 	return "", nil
 }
 
-func (s *Search) getAreas(areaCodes []string) ([]*models.Area, error) {
-	areasInDB, err := models.Areas(models.AreaWhere.Name.IN(areaCodes)).All(s.DB)
+func (s *Scraper) getAreas(areaCodes []string) ([]*models.Area, error) {
+	areasInDB, err := models.Areas(models.AreaWhere.Name.IN(areaCodes)).All(s.db)
 	if err != nil {
 		return nil, err
 	}
@@ -210,14 +131,14 @@ func (s *Search) getAreas(areaCodes []string) ([]*models.Area, error) {
 				City:     area.Parent.Name,
 			}
 
-			dbArea.Insert(s.DB, boil.Infer())
+			dbArea.Insert(s.db, boil.Infer())
 		}
 	}
 
-	return models.Areas(models.AreaWhere.Name.IN(areaCodes)).All(s.DB)
+	return models.Areas(models.AreaWhere.Name.IN(areaCodes)).All(s.db)
 }
 
-func (s *Search) apiCall(endpoint string) *http.Request {
+func (s *Scraper) apiCall(endpoint string) *http.Request {
 	url := "https://asunnot.oikotie.fi/api/3.0/" + endpoint
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("ota-token", s.requestParams.token)
@@ -230,7 +151,7 @@ func (s *Search) apiCall(endpoint string) *http.Request {
 	return req
 }
 
-func (s *Search) getArea(areaCode string) (ApiArea, error) {
+func (s *Scraper) getArea(areaCode string) (ApiArea, error) {
 	client := &http.Client{}
 
 	req := s.apiCall("location")
@@ -253,6 +174,102 @@ func (s *Search) getArea(areaCode string) (ApiArea, error) {
 	}
 
 	return list[0], nil
+}
+
+func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
+	req, _ := http.NewRequest("GET", cardsURL, nil)
+	req.Header.Set("ota-token", s.requestParams.token)
+	req.Header.Set("ota-cuid", s.requestParams.cuid)
+	req.Header.Set("ota-loaded", s.requestParams.loaded)
+	for _, cookie := range s.requestParams.cookies {
+		req.AddCookie(cookie)
+	}
+
+	q := req.URL.Query()
+	q.Add("buildingType[]", "1") // Kerrostalo
+	q.Add("buildingType[]", "256")
+	q.Add("cardType", "100")      // Not sure
+	q.Add("conditionType[]", "1") // Erinomainen, Hyvä, Tyydyttävä, Välttävä, Huono
+	q.Add("conditionType[]", "2")
+	q.Add("conditionType[]", "4")
+	q.Add("conditionType[]", "8")
+	q.Add("conditionType[]", "16")
+	// areaStrings := make([]string, len(areas))
+	// for i, a := range areas {
+	// 	areaStrings[i] = fmt.Sprintf("[%d,%d,\"%s, Helsinki\"]", a.AreaID, a.CardType, a.Name)
+	// }
+	// q.Add("locations", fmt.Sprintf("[%s]", strings.Join(areaStrings, ",")))
+	q.Add("locations", fmt.Sprintf("[[%d, %d,\"%s, %s\"]]", area.ID, area.CardType, area.Name, area.City))
+
+	q.Add("lotOwnershipType[]", "1") // Oma, Vuokralla, Valinnainen vuokratontti
+	q.Add("lotOwnershipType[]", "2")
+	q.Add("lotOwnershipType[]", "3")
+	q.Add("price[max]", strconv.Itoa(s.options.MaxPrice))
+	q.Add("price[min]", strconv.Itoa(s.options.MinPrice))
+	q.Add("size[max]", strconv.Itoa(s.options.MaxSize))
+	q.Add("size[min]", strconv.Itoa(s.options.MinSize))
+	q.Add("sortBy", "published_sort_desc")
+	q.Add("limit", "1")
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	listings := []*models.Listing{}
+
+	var listingsResponse struct {
+		Cards []map[string]interface{} `json:"cards"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&listingsResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	reg, err := regexp.Compile("[^0-9]+")
+	if err != nil {
+		return nil, err
+	}
+	for _, apiListing := range listingsResponse.Cards {
+		price, err := strconv.Atoi(reg.ReplaceAllString(apiListing["price"].(string), ""))
+		if err != nil {
+			return nil, err
+		}
+
+		listing := &models.Listing{
+			ID:    int(apiListing["id"].(float64)),
+			Price: price,
+		}
+		err = listing.ListingData.Marshal(apiListing)
+		if err != nil {
+			return nil, err
+		}
+
+		err = listing.SetArea(s.db, false, area)
+		if err != nil {
+			return nil, err
+		}
+
+		listingDetails, err := getListingDetails(listing, area)
+		if err != nil {
+			return nil, err
+		}
+
+		err = listing.ListingDetails.Marshal(listingDetails)
+		if err != nil {
+			return nil, err
+		}
+
+		err = listing.Insert(s.db, boil.Infer())
+		if err != nil {
+			return nil, err
+		}
+
+		listings = append(listings, listing)
+	}
+
+	return listings, nil
 }
 
 func getRequestParams() (requestParams, error) {
@@ -310,12 +327,7 @@ func parseMetaAttrs(params *requestParams, body io.Reader) error {
 
 type details = map[string]map[string]string
 
-func (s *Search) getListingDetails(listing models.Listing) (details, error) {
-	area, err := listing.Area().One(s.DB)
-	if err != nil {
-		return nil, err
-	}
-
+func getListingDetails(listing *models.Listing, area *models.Area) (details, error) {
 	resp, err := http.Get(fmt.Sprintf("https://asunnot.oikotie.fi/myytavat-asunnot/%s/%d", area.City, listing.ID))
 	if err != nil {
 		return nil, err

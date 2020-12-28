@@ -19,7 +19,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	search := scraper.CreateSearch(db).SetAreaCodes([]string{"00200", "00340"})
+	search := scraper.Create(db).SetAreaCodes([]string{"00200", "00340"})
 	res, err := search.Run()
 	if err != nil {
 		log.Fatal(err)
