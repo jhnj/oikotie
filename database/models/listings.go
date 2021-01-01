@@ -18,19 +18,25 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"github.com/volatiletech/sqlboiler/v4/queries/qmhelper"
+	"github.com/volatiletech/sqlboiler/v4/types/pgeo"
 	"github.com/volatiletech/strmangle"
 )
 
 // Listing is an object representing the database table.
 type Listing struct {
-	ID             int       `boil:"id" json:"id" toml:"id" yaml:"id"`
-	CreatedAt      null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
-	ExternalID     int       `boil:"external_id" json:"external_id" toml:"external_id" yaml:"external_id"`
-	AreaID         int       `boil:"area_id" json:"area_id" toml:"area_id" yaml:"area_id"`
-	Price          int       `boil:"price" json:"price" toml:"price" yaml:"price"`
-	ListingData    null.JSON `boil:"listing_data" json:"listing_data,omitempty" toml:"listing_data" yaml:"listing_data,omitempty"`
-	ListingDetails null.JSON `boil:"listing_details" json:"listing_details,omitempty" toml:"listing_details" yaml:"listing_details,omitempty"`
-	DateAccessed   time.Time `boil:"date_accessed" json:"date_accessed" toml:"date_accessed" yaml:"date_accessed"`
+	ID             int            `boil:"id" json:"id" toml:"id" yaml:"id"`
+	CreatedAt      null.Time      `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	ExternalID     int            `boil:"external_id" json:"external_id" toml:"external_id" yaml:"external_id"`
+	AreaID         int            `boil:"area_id" json:"area_id" toml:"area_id" yaml:"area_id"`
+	Price          int            `boil:"price" json:"price" toml:"price" yaml:"price"`
+	Size           float64        `boil:"size" json:"size" toml:"size" yaml:"size"`
+	Rooms          int            `boil:"rooms" json:"rooms" toml:"rooms" yaml:"rooms"`
+	Visits         int            `boil:"visits" json:"visits" toml:"visits" yaml:"visits"`
+	Floor          int            `boil:"floor" json:"floor" toml:"floor" yaml:"floor"`
+	ListingData    null.JSON      `boil:"listing_data" json:"listing_data,omitempty" toml:"listing_data" yaml:"listing_data,omitempty"`
+	ListingDetails null.JSON      `boil:"listing_details" json:"listing_details,omitempty" toml:"listing_details" yaml:"listing_details,omitempty"`
+	DateAccessed   time.Time      `boil:"date_accessed" json:"date_accessed" toml:"date_accessed" yaml:"date_accessed"`
+	Coord          pgeo.NullPoint `boil:"coord" json:"coord,omitempty" toml:"coord" yaml:"coord,omitempty"`
 
 	R *listingR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L listingL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -42,18 +48,28 @@ var ListingColumns = struct {
 	ExternalID     string
 	AreaID         string
 	Price          string
+	Size           string
+	Rooms          string
+	Visits         string
+	Floor          string
 	ListingData    string
 	ListingDetails string
 	DateAccessed   string
+	Coord          string
 }{
 	ID:             "id",
 	CreatedAt:      "created_at",
 	ExternalID:     "external_id",
 	AreaID:         "area_id",
 	Price:          "price",
+	Size:           "size",
+	Rooms:          "rooms",
+	Visits:         "visits",
+	Floor:          "floor",
 	ListingData:    "listing_data",
 	ListingDetails: "listing_details",
 	DateAccessed:   "date_accessed",
+	Coord:          "coord",
 }
 
 // Generated where
@@ -79,6 +95,35 @@ func (w whereHelpernull_Time) GT(x null.Time) qm.QueryMod {
 }
 func (w whereHelpernull_Time) GTE(x null.Time) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+
+type whereHelperfloat64 struct{ field string }
+
+func (w whereHelperfloat64) EQ(x float64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.EQ, x) }
+func (w whereHelperfloat64) NEQ(x float64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.NEQ, x)
+}
+func (w whereHelperfloat64) LT(x float64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.LT, x) }
+func (w whereHelperfloat64) LTE(x float64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelperfloat64) GT(x float64) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.GT, x) }
+func (w whereHelperfloat64) GTE(x float64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+func (w whereHelperfloat64) IN(slice []float64) qm.QueryMod {
+	values := make([]interface{}, 0, len(slice))
+	for _, value := range slice {
+		values = append(values, value)
+	}
+	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
+}
+func (w whereHelperfloat64) NIN(slice []float64) qm.QueryMod {
+	values := make([]interface{}, 0, len(slice))
+	for _, value := range slice {
+		values = append(values, value)
+	}
+	return qm.WhereNotIn(fmt.Sprintf("%s NOT IN ?", w.field), values...)
 }
 
 type whereHelpernull_JSON struct{ field string }
@@ -125,24 +170,57 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
 }
 
+type whereHelperpgeo_NullPoint struct{ field string }
+
+func (w whereHelperpgeo_NullPoint) EQ(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, false, x)
+}
+func (w whereHelperpgeo_NullPoint) NEQ(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, true, x)
+}
+func (w whereHelperpgeo_NullPoint) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
+func (w whereHelperpgeo_NullPoint) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
+func (w whereHelperpgeo_NullPoint) LT(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelperpgeo_NullPoint) LTE(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelperpgeo_NullPoint) GT(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelperpgeo_NullPoint) GTE(x pgeo.NullPoint) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+
 var ListingWhere = struct {
 	ID             whereHelperint
 	CreatedAt      whereHelpernull_Time
 	ExternalID     whereHelperint
 	AreaID         whereHelperint
 	Price          whereHelperint
+	Size           whereHelperfloat64
+	Rooms          whereHelperint
+	Visits         whereHelperint
+	Floor          whereHelperint
 	ListingData    whereHelpernull_JSON
 	ListingDetails whereHelpernull_JSON
 	DateAccessed   whereHelpertime_Time
+	Coord          whereHelperpgeo_NullPoint
 }{
 	ID:             whereHelperint{field: "\"listings\".\"id\""},
 	CreatedAt:      whereHelpernull_Time{field: "\"listings\".\"created_at\""},
 	ExternalID:     whereHelperint{field: "\"listings\".\"external_id\""},
 	AreaID:         whereHelperint{field: "\"listings\".\"area_id\""},
 	Price:          whereHelperint{field: "\"listings\".\"price\""},
+	Size:           whereHelperfloat64{field: "\"listings\".\"size\""},
+	Rooms:          whereHelperint{field: "\"listings\".\"rooms\""},
+	Visits:         whereHelperint{field: "\"listings\".\"visits\""},
+	Floor:          whereHelperint{field: "\"listings\".\"floor\""},
 	ListingData:    whereHelpernull_JSON{field: "\"listings\".\"listing_data\""},
 	ListingDetails: whereHelpernull_JSON{field: "\"listings\".\"listing_details\""},
 	DateAccessed:   whereHelpertime_Time{field: "\"listings\".\"date_accessed\""},
+	Coord:          whereHelperpgeo_NullPoint{field: "\"listings\".\"coord\""},
 }
 
 // ListingRels is where relationship names are stored.
@@ -166,8 +244,8 @@ func (*listingR) NewStruct() *listingR {
 type listingL struct{}
 
 var (
-	listingAllColumns            = []string{"id", "created_at", "external_id", "area_id", "price", "listing_data", "listing_details", "date_accessed"}
-	listingColumnsWithoutDefault = []string{"external_id", "area_id", "price", "listing_data", "listing_details"}
+	listingAllColumns            = []string{"id", "created_at", "external_id", "area_id", "price", "size", "rooms", "visits", "floor", "listing_data", "listing_details", "date_accessed", "coord"}
+	listingColumnsWithoutDefault = []string{"external_id", "area_id", "price", "size", "rooms", "visits", "floor", "listing_data", "listing_details", "coord"}
 	listingColumnsWithDefault    = []string{"id", "created_at", "date_accessed"}
 	listingPrimaryKeyColumns     = []string{"id"}
 )

@@ -13,6 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	_ "github.com/lib/pq"
 	"github.com/volatiletech/sqlboiler/v4/boil"
+	"github.com/volatiletech/sqlboiler/v4/types/pgeo"
 )
 
 const cardsURL = "https://asunnot.oikotie.fi/api/cards"
@@ -235,20 +236,9 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 		return nil, err
 	}
 
-	reg, err := regexp.Compile("[^0-9]+")
-	if err != nil {
-		return nil, err
-	}
 	for _, apiListing := range listingsResponse.Cards {
-		price, err := strconv.Atoi(reg.ReplaceAllString(apiListing["price"].(string), ""))
-		if err != nil {
-			return nil, err
-		}
+		listing := &models.Listing{}
 
-		listing := &models.Listing{
-			ExternalID: int(apiListing["id"].(float64)),
-			Price:      price,
-		}
 		err = listing.ListingData.Marshal(apiListing)
 		if err != nil {
 			return nil, err
@@ -259,12 +249,17 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 			return nil, err
 		}
 
-		listingDetails, err := getListingDetails(listing, area)
+		listingDetails, err := getListingDetails(int(apiListing["id"].(float64)), area)
 		if err != nil {
 			return nil, err
 		}
 
 		err = listing.ListingDetails.Marshal(listingDetails)
+		if err != nil {
+			return nil, err
+		}
+
+		err = setDerivedFields(listing)
 		if err != nil {
 			return nil, err
 		}
@@ -333,10 +328,10 @@ func parseMetaAttrs(params *requestParams, body io.Reader) error {
 	return nil
 }
 
-type details = map[string]map[string]string
+type listingDetails = map[string]map[string]string
 
-func getListingDetails(listing *models.Listing, area *models.Area) (details, error) {
-	resp, err := http.Get(fmt.Sprintf("https://asunnot.oikotie.fi/myytavat-asunnot/%s/%d", area.City, listing.ExternalID))
+func getListingDetails(externalID int, area *models.Area) (listingDetails, error) {
+	resp, err := http.Get(fmt.Sprintf("https://asunnot.oikotie.fi/myytavat-asunnot/%s/%d", area.City, externalID))
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +339,7 @@ func getListingDetails(listing *models.Listing, area *models.Area) (details, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Request failed %d %s, id: %d", resp.StatusCode, resp.Status, listing.ID)
+		return nil, fmt.Errorf("Request failed %d %s, external id: %d", resp.StatusCode, resp.Status, externalID)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -352,7 +347,7 @@ func getListingDetails(listing *models.Listing, area *models.Area) (details, err
 		return nil, err
 	}
 
-	listingDetails := make(details)
+	details := make(listingDetails)
 
 	doc.Find(".listing-details-container").Find(".listing-details").Each(func(i int, s *goquery.Selection) {
 		h := s.Find("h3").First().Text()
@@ -370,8 +365,67 @@ func getListingDetails(listing *models.Listing, area *models.Area) (details, err
 			}
 		})
 
-		listingDetails[h] = cat
+		details[h] = cat
 	})
 
-	return listingDetails, nil
+	return details, nil
+}
+
+var onlyNumbers = regexp.MustCompile("[^0-9]+")
+var floorReg = regexp.MustCompile("^[0-9]+")
+
+func setDerivedFields(listing *models.Listing) error {
+	var data map[string]interface{}
+	err := listing.ListingData.Unmarshal(&data)
+	if err != nil {
+		return err
+	}
+
+	var details listingDetails
+	err = listing.ListingDetails.Unmarshal(&details)
+	if err != nil {
+		return err
+	}
+
+	listing.ExternalID = int(data["id"].(float64))
+
+	price, err := strconv.Atoi(onlyNumbers.ReplaceAllString(data["price"].(string), ""))
+	if err != nil {
+		return err
+	}
+	listing.Price = price
+
+	listing.Size = data["size"].(float64)
+
+	listing.Rooms = int(data["rooms"].(float64))
+
+	listing.Visits = int(data["visits"].(float64))
+
+	floor, err := strconv.Atoi(floorReg.FindString(details["Perustiedot"]["Kerros"]))
+	if err != nil {
+		return err
+	}
+	listing.Floor = floor
+
+	lat := data["coordinates"].(map[string]interface{})["latitude"].(float64)
+	long := data["coordinates"].(map[string]interface{})["longitude"].(float64)
+	listing.Coord.Point = pgeo.NewPoint(lat, long)
+	listing.Coord.Valid = true
+
+	return nil
+}
+
+func UpdateListing(db *sql.DB, id int) error {
+	listing, err := models.FindListing(db, id)
+	if err != nil {
+		return err
+	}
+
+	err = setDerivedFields(listing)
+	if err != nil {
+		return err
+	}
+
+	_, err = listing.Update(db, boil.Infer())
+	return err
 }

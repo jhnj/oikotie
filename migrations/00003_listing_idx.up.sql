@@ -1,0 +1,1 @@
+CREATE INDEX idx_listings_external_id_compound ON listings(external_id, created_at);

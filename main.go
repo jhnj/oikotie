@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"oikotie/config"
 	"oikotie/scraper"
@@ -19,10 +18,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	search := scraper.Create(db).SetAreaCodes([]string{"00200", "00340"})
-	res, err := search.Run()
+	// search := scraper.Create(db).SetAreaCodes([]string{"00200", "00340"})
+	// res, err := search.Run()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println(res)
+
+	err = scraper.UpdateListing(db, 4)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(res)
 }

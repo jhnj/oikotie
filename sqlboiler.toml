@@ -16,3 +16,4 @@ port = 5432
 dbname = "oikotie"
 sslmode = "disable"
 pass = "password"
+blacklist = ["schema_migrations", "spatial_ref_sys"]

@@ -4,11 +4,9 @@
 package models
 
 var TableNames = struct {
-	Areas            string
-	Listings         string
-	SchemaMigrations string
+	Areas    string
+	Listings string
 }{
-	Areas:            "areas",
-	Listings:         "listings",
-	SchemaMigrations: "schema_migrations",
+	Areas:    "areas",
+	Listings: "listings",
 }
