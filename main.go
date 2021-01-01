@@ -5,9 +5,13 @@ import (
 	"log"
 	"oikotie/config"
 	"oikotie/scraper"
+
+	"oikotie/cmd"
 )
 
 func main() {
+	cmd.Execute()
+	return
 	cfg, err := config.NewReader()
 	if err != nil {
 		log.Fatal(err)

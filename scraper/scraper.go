@@ -259,7 +259,7 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 			return nil, err
 		}
 
-		err = setDerivedFields(listing)
+		err = SetDerivedFields(listing)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +374,7 @@ func getListingDetails(externalID int, area *models.Area) (listingDetails, error
 var onlyNumbers = regexp.MustCompile("[^0-9]+")
 var floorReg = regexp.MustCompile("^[0-9]+")
 
-func setDerivedFields(listing *models.Listing) error {
+func SetDerivedFields(listing *models.Listing) error {
 	var data map[string]interface{}
 	err := listing.ListingData.Unmarshal(&data)
 	if err != nil {
@@ -421,7 +421,7 @@ func UpdateListing(db *sql.DB, id int) error {
 		return err
 	}
 
-	err = setDerivedFields(listing)
+	err = SetDerivedFields(listing)
 	if err != nil {
 		return err
 	}
