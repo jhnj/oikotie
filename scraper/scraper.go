@@ -3,6 +3,7 @@ package scraper
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -380,14 +381,24 @@ func SetDerivedFields(listing *models.Listing) error {
 	if err != nil {
 		return err
 	}
+	if len(data) == 0 {
+		return fmt.Errorf("data empty")
+	}
 
 	var details listingDetails
 	err = listing.ListingDetails.Unmarshal(&details)
 	if err != nil {
 		return err
 	}
+	if len(details) == 0 {
+		return fmt.Errorf("details empty")
+	}
 
-	listing.ExternalID = int(data["id"].(float64))
+	externalID, ok := data["id"].(float64)
+	if !ok {
+		return errors.New("Cast failed: ExternalID")
+	}
+	listing.ExternalID = int(externalID)
 
 	price, err := strconv.Atoi(onlyNumbers.ReplaceAllString(data["price"].(string), ""))
 	if err != nil {
