@@ -78,7 +78,7 @@ func Create(db *sql.DB) *Scraper {
 	retryClient.RetryWaitMax = time.Hour
 	retryClient.RetryMax = 5
 
-	search.client = retryClient.StandardClient() // *http.Client
+	search.client = retryClient.StandardClient()
 
 	return search
 }
