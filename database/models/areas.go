@@ -22,25 +22,28 @@ import (
 
 // Area is an object representing the database table.
 type Area struct {
-	ID       int    `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Name     string `boil:"name" json:"name" toml:"name" yaml:"name"`
-	City     string `boil:"city" json:"city" toml:"city" yaml:"city"`
-	CardType int    `boil:"card_type" json:"card_type" toml:"card_type" yaml:"card_type"`
+	ID         int    `boil:"id" json:"id" toml:"id" yaml:"id"`
+	ExternalID int    `boil:"external_id" json:"external_id" toml:"external_id" yaml:"external_id"`
+	Name       string `boil:"name" json:"name" toml:"name" yaml:"name"`
+	City       string `boil:"city" json:"city" toml:"city" yaml:"city"`
+	CardType   int    `boil:"card_type" json:"card_type" toml:"card_type" yaml:"card_type"`
 
 	R *areaR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L areaL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var AreaColumns = struct {
-	ID       string
-	Name     string
-	City     string
-	CardType string
+	ID         string
+	ExternalID string
+	Name       string
+	City       string
+	CardType   string
 }{
-	ID:       "id",
-	Name:     "name",
-	City:     "city",
-	CardType: "card_type",
+	ID:         "id",
+	ExternalID: "external_id",
+	Name:       "name",
+	City:       "city",
+	CardType:   "card_type",
 }
 
 // Generated where
@@ -92,15 +95,17 @@ func (w whereHelperstring) NIN(slice []string) qm.QueryMod {
 }
 
 var AreaWhere = struct {
-	ID       whereHelperint
-	Name     whereHelperstring
-	City     whereHelperstring
-	CardType whereHelperint
+	ID         whereHelperint
+	ExternalID whereHelperint
+	Name       whereHelperstring
+	City       whereHelperstring
+	CardType   whereHelperint
 }{
-	ID:       whereHelperint{field: "\"areas\".\"id\""},
-	Name:     whereHelperstring{field: "\"areas\".\"name\""},
-	City:     whereHelperstring{field: "\"areas\".\"city\""},
-	CardType: whereHelperint{field: "\"areas\".\"card_type\""},
+	ID:         whereHelperint{field: "\"areas\".\"id\""},
+	ExternalID: whereHelperint{field: "\"areas\".\"external_id\""},
+	Name:       whereHelperstring{field: "\"areas\".\"name\""},
+	City:       whereHelperstring{field: "\"areas\".\"city\""},
+	CardType:   whereHelperint{field: "\"areas\".\"card_type\""},
 }
 
 // AreaRels is where relationship names are stored.
@@ -124,9 +129,9 @@ func (*areaR) NewStruct() *areaR {
 type areaL struct{}
 
 var (
-	areaAllColumns            = []string{"id", "name", "city", "card_type"}
-	areaColumnsWithoutDefault = []string{"id", "name", "city", "card_type"}
-	areaColumnsWithDefault    = []string{}
+	areaAllColumns            = []string{"id", "external_id", "name", "city", "card_type"}
+	areaColumnsWithoutDefault = []string{"external_id", "name", "city", "card_type"}
+	areaColumnsWithDefault    = []string{"id"}
 	areaPrimaryKeyColumns     = []string{"id"}
 )
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"oikotie/database/models"
 	"regexp"
@@ -136,11 +137,20 @@ func (s *Scraper) getAreas(areaCodes []string) ([]*models.Area, error) {
 				return nil, err
 			}
 
+			exists, err := models.Areas(models.AreaWhere.ExternalID.EQ(area.Card.CardID)).Exists(s.db)
+			if err != nil {
+				return nil, err
+			}
+
+			if exists {
+				continue
+			}
+
 			dbArea := models.Area{
-				ID:       area.Card.CardID,
-				Name:     area.Card.Name,
-				CardType: area.Card.CardType,
-				City:     area.Parent.Name,
+				ExternalID: area.Card.CardID,
+				Name:       area.Card.Name,
+				CardType:   area.Card.CardType,
+				City:       area.Parent.Name,
 			}
 
 			err = dbArea.Insert(s.db, boil.Infer())
@@ -221,7 +231,7 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 	// 	areaStrings[i] = fmt.Sprintf("[%d,%d,\"%s, Helsinki\"]", a.AreaID, a.CardType, a.Name)
 	// }
 	// q.Add("locations", fmt.Sprintf("[%s]", strings.Join(areaStrings, ",")))
-	q.Add("locations", fmt.Sprintf("[[%d, %d,\"%s, %s\"]]", area.ID, area.CardType, area.Name, area.City))
+	q.Add("locations", fmt.Sprintf("[[%d, %d,\"%s, %s\"]]", area.ExternalID, area.CardType, area.Name, area.City))
 
 	q.Add("lotOwnershipType[]", "1") // Oma, Vuokralla, Valinnainen vuokratontti
 	q.Add("lotOwnershipType[]", "2")
@@ -274,7 +284,7 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 
 		err = SetDerivedFields(listing)
 		if err != nil {
-			return nil, err
+			log.Printf("Failed to set derived fields, err: [%s], listing id: %d", err.Error(), listing.ExternalID)
 		}
 
 		err = listing.Insert(s.db, boil.Infer())
@@ -414,24 +424,42 @@ func SetDerivedFields(listing *models.Listing) error {
 
 	price, err := strconv.Atoi(onlyNumbers.ReplaceAllString(data["price"].(string), ""))
 	if err != nil {
-		return err
+		return fmt.Errorf("price, %w", err)
 	}
 	listing.Price = price
 
-	listing.Size = data["size"].(float64)
+	size, ok := data["size"].(float64)
+	if !ok {
+		return errors.New("Cast failed: Size")
+	}
+	listing.Size = size
 
-	listing.Rooms = int(data["rooms"].(float64))
+	rooms, ok := data["rooms"].(float64)
+	if !ok {
+		return errors.New("Cast failed: Rooms")
+	}
+	listing.Rooms = int(rooms)
 
-	listing.Visits = int(data["visits"].(float64))
+	visits, ok := data["visits"].(float64)
+	if !ok {
+		return errors.New("Cast failed: Visits")
+	}
+	listing.Visits = int(visits)
 
 	floor, err := strconv.Atoi(floorReg.FindString(details["Perustiedot"]["Kerros"]))
 	if err != nil {
-		return err
+		return fmt.Errorf("floor, %w", err)
 	}
 	listing.Floor = floor
 
-	lat := data["coordinates"].(map[string]interface{})["latitude"].(float64)
-	long := data["coordinates"].(map[string]interface{})["longitude"].(float64)
+	lat, err := getCoordinates(data, "latitude")
+	if err != nil {
+		return err
+	}
+	long, err := getCoordinates(data, "longitude")
+	if err != nil {
+		return err
+	}
 	listing.Coord.Point = pgeo.NewPoint(lat, long)
 	listing.Coord.Valid = true
 
@@ -451,4 +479,17 @@ func UpdateListing(db *sql.DB, id int) error {
 
 	_, err = listing.Update(db, boil.Infer())
 	return err
+}
+
+func getCoordinates(data map[string]interface{}, latLong string) (float64, error) {
+	coords, ok := data["coordinates"].(map[string]interface{})
+	if !ok {
+		return 0, fmt.Errorf("Cast failed: Coordinates")
+	}
+	value, ok := coords[latLong].(float64)
+	if !ok {
+		return 0, fmt.Errorf("Cast failed: %s", latLong)
+	}
+
+	return value, nil
 }

@@ -11,11 +11,11 @@ import (
 
 type SearchConfig struct {
 	Areas []string `json:"areas"`
-	Price struct {
+	Price *struct {
 		Min int `json:"min"`
 		Max int `json:"max"`
 	} `json:"price"`
-	Size struct {
+	Size *struct {
 		Min int `json:"min"`
 		Max int `json:"max"`
 	} `json:"size"`
@@ -35,7 +35,7 @@ func NewReader() (*Reader, error) {
 	return &Reader{map[string]string{}, nil}, nil
 }
 
-func (r Reader) get(key string) string {
+func (r *Reader) get(key string) string {
 	if value, ok := r.cache[key]; ok {
 		return value
 	}
@@ -49,20 +49,20 @@ func (r Reader) get(key string) string {
 	return value
 }
 
-func (r Reader) DatabaseURL() string {
+func (r *Reader) DatabaseURL() string {
 	return r.get("DATABASE_URL")
 }
 
-func (r Reader) SearchConfig() *SearchConfig {
+func (r *Reader) SearchConfig() *SearchConfig {
 	if r.searchConfig == nil {
 		raw, err := ioutil.ReadFile(r.get("SEARCH_CONFIG_PATH"))
 		if err != nil {
-			panic(fmt.Errorf("Failed to read config"))
+			panic(fmt.Errorf("Failed to read config, %w", err))
 		}
 
-		err = json.Unmarshal(raw, r.searchConfig)
+		err = json.Unmarshal(raw, &r.searchConfig)
 		if err != nil {
-			panic(fmt.Errorf("Failed to parse config"))
+			panic(fmt.Errorf("Failed to parse config, %w", err))
 		}
 	}
 
