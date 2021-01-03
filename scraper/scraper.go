@@ -11,8 +11,10 @@ import (
 	"oikotie/database/models"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/hashicorp/go-retryablehttp"
 	_ "github.com/lib/pq"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/types/pgeo"
@@ -68,9 +70,15 @@ func Create(db *sql.DB) *Scraper {
 			MinSize:   1,
 			AreaCodes: []string{"00200"},
 		},
-		db:     db,
-		client: &http.Client{},
+		db: db,
 	}
+
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryWaitMin = time.Minute * 20
+	retryClient.RetryWaitMax = time.Hour
+	retryClient.RetryMax = 5
+
+	search.client = retryClient.StandardClient() // *http.Client
 
 	return search
 }
@@ -177,8 +185,6 @@ func (s *Scraper) apiCall(endpoint string) *http.Request {
 }
 
 func (s *Scraper) getArea(areaCode string) (apiArea, error) {
-	client := &http.Client{}
-
 	req := s.apiCall("location")
 
 	q := req.URL.Query()
@@ -186,10 +192,13 @@ func (s *Scraper) getArea(areaCode string) (apiArea, error) {
 
 	req.URL.RawQuery = q.Encode()
 
-	resp, _ := client.Do(req)
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return apiArea{}, err
+	}
 
 	var allMatching []apiArea
-	err := json.NewDecoder(resp.Body).Decode(&allMatching)
+	err = json.NewDecoder(resp.Body).Decode(&allMatching)
 	if err != nil {
 		return apiArea{}, err
 	}
