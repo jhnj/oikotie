@@ -19,6 +19,11 @@ import (
 
 const cardsURL = "https://asunnot.oikotie.fi/api/cards"
 
+var acceptedCardIDs = map[int]interface{}{
+	4: struct{}{}, // kaupunginosa
+	5: struct{}{}, // postinumeroalue
+}
+
 type requestParams struct {
 	token   string
 	loaded  string
@@ -173,17 +178,24 @@ func (s *Scraper) getArea(areaCode string) (apiArea, error) {
 
 	resp, _ := client.Do(req)
 
-	var list []apiArea
-	err := json.NewDecoder(resp.Body).Decode(&list)
+	var allMatching []apiArea
+	err := json.NewDecoder(resp.Body).Decode(&allMatching)
 	if err != nil {
 		return apiArea{}, err
 	}
 
-	if len(list) != 1 {
-		return apiArea{}, fmt.Errorf("Expected 1 card got %d", len(list))
+	cityAreas := make([]apiArea, 0)
+	for _, area := range allMatching {
+		if _, ok := acceptedCardIDs[area.Card.CardType]; ok {
+			cityAreas = append(cityAreas, area)
+		}
 	}
 
-	return list[0], nil
+	if len(cityAreas) != 1 {
+		return apiArea{}, fmt.Errorf("Expected 1 card for code '%s', got %d", areaCode, len(cityAreas))
+	}
+
+	return allMatching[0], nil
 }
 
 func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {

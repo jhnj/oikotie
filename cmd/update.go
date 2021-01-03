@@ -17,7 +17,7 @@ var updateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		di := setup()
 
-		search := scraper.Create(di.db).SetAreaCodes([]string{"00200", "00340"})
+		search := scraper.Create(di.db).SetAreaCodes([]string{"Lauttasaari, Helsinki", "00340"})
 		_, err := search.Run()
 		if err != nil {
 			log.Fatal(err)
