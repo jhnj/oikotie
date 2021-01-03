@@ -1,0 +1,11 @@
+{
+    "areas": ["00100", "Otaniemi, Espoo"],
+    "price": {
+        "min": 1000,
+        "max": 10000
+    },
+    "size": {
+        "min": 20,
+        "max": 40
+    }
+}
