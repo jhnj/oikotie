@@ -229,12 +229,12 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 	q := req.URL.Query()
 	q.Add("buildingType[]", "1") // Kerrostalo
 	q.Add("buildingType[]", "256")
-	q.Add("cardType", "100")      // Not sure
-	q.Add("conditionType[]", "1") // Erinomainen, Hyvä, Tyydyttävä, Välttävä, Huono
-	q.Add("conditionType[]", "2")
-	q.Add("conditionType[]", "4")
-	q.Add("conditionType[]", "8")
-	q.Add("conditionType[]", "16")
+	q.Add("cardType", "100") // Not sure
+	// q.Add("conditionType[]", "1") // Erinomainen, Hyvä, Tyydyttävä, Välttävä, Huono
+	// q.Add("conditionType[]", "2")
+	// q.Add("conditionType[]", "4")
+	// q.Add("conditionType[]", "8")
+	// q.Add("conditionType[]", "16")
 	// areaStrings := make([]string, len(areas))
 	// for i, a := range areas {
 	// 	areaStrings[i] = fmt.Sprintf("[%d,%d,\"%s, Helsinki\"]", a.AreaID, a.CardType, a.Name)
@@ -242,9 +242,9 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 	// q.Add("locations", fmt.Sprintf("[%s]", strings.Join(areaStrings, ",")))
 	q.Add("locations", fmt.Sprintf("[[%d, %d,\"%s, %s\"]]", area.ExternalID, area.CardType, area.Name, area.City))
 
-	q.Add("lotOwnershipType[]", "1") // Oma, Vuokralla, Valinnainen vuokratontti
-	q.Add("lotOwnershipType[]", "2")
-	q.Add("lotOwnershipType[]", "3")
+	// q.Add("lotOwnershipType[]", "1") // Oma, Vuokralla, Valinnainen vuokratontti
+	// q.Add("lotOwnershipType[]", "2")
+	// q.Add("lotOwnershipType[]", "3")
 	q.Add("price[max]", strconv.Itoa(s.options.MaxPrice))
 	q.Add("price[min]", strconv.Itoa(s.options.MinPrice))
 	q.Add("size[max]", strconv.Itoa(s.options.MaxSize))
