@@ -6,7 +6,7 @@ build: clean
 test:
 	go test ./...
 run: build
-	./bin/ot
+	./bin/ot update
 clean:
 	rm -rf bin/*
 migrate:

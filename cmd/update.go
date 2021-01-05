@@ -15,6 +15,7 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Scrape Oikotie and update data",
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Println("Running Oikotie update")
 		di := setup()
 
 		search := scraper.Create(di.db).SetAreaCodes(di.cfg.SearchConfig().Areas)
@@ -25,9 +26,11 @@ var updateCmd = &cobra.Command{
 			search.SetSize(s.Min, s.Max)
 		}
 
-		_, err := search.Run()
+		l, err := search.Run()
 		if err != nil {
 			log.Fatal(err)
+		} else {
+			log.Printf("Update successfull, created %d listings\n", len(l))
 		}
 	},
 }
