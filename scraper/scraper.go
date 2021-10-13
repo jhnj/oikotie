@@ -548,8 +548,6 @@ func downloadImages(area *models.Area, listing *models.Listing) error {
 		return errors.Wrap(err, "unable to create images folder")
 	}
 	for i, url := range imagesURLs {
-		fmt.Println(url)
-
 		response, err := http.Get(url)
 		if err != nil {
 			return err
