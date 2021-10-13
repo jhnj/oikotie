@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Perform all actions as $POSTGRES_USER
-export PGUSER="$POSTGRES_USER"
+export PGUSER="${POSTGRES_USER:-postgres}"
 
 psql <<-'EOSQL'
 DO $$
