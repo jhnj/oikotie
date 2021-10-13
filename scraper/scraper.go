@@ -3,17 +3,19 @@ package scraper
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"oikotie/database/models"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/friendsofgo/errors"
 	"github.com/hashicorp/go-retryablehttp"
 	_ "github.com/lib/pq"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -115,10 +117,17 @@ func (s *Scraper) Run() ([]*models.Listing, error) {
 	l := []*models.Listing{}
 	for _, area := range areas {
 		nl, err := s.getListings(area)
-		l = append(l, nl...)
 		if err != nil {
 			return nil, err
 		}
+		for _, listing := range nl {
+			err := downloadImages(area, listing)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		l = append(l, nl...)
 	}
 
 	return l, nil
@@ -268,7 +277,7 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 		return nil, err
 	}
 
-	for _, apiListing := range listingsResponse.Cards {
+	for _, apiListing := range listingsResponse.Cards[:3] {
 		listing := &models.Listing{}
 
 		err = listing.ListingData.Marshal(apiListing)
@@ -501,4 +510,67 @@ func getCoordinates(data map[string]interface{}, latLong string) (float64, error
 	}
 
 	return value, nil
+}
+
+func downloadImages(area *models.Area, listing *models.Listing) error {
+	url := fmt.Sprintf("https://asunnot.oikotie.fi/myytavat-asunnot/%s/%d/kuvat", area.City, listing.ExternalID)
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Request failed %d %s", resp.StatusCode, url)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	imagesURLs := []string{}
+
+	doc.Find(".listing-media-item").Each(func(i int, s *goquery.Selection) {
+		url, exists := s.Find("img").First().Attr("src")
+		if !exists {
+			err = errors.New("img not found")
+			return
+		}
+
+		imagesURLs = append(imagesURLs, url)
+	})
+
+	dir := filepath.Join(".", "images", strconv.Itoa(listing.ExternalID))
+	err = os.MkdirAll(dir, 0700)
+	if err != nil {
+		return errors.Wrap(err, "unable to create images folder")
+	}
+	for i, url := range imagesURLs {
+		fmt.Println(url)
+
+		response, err := http.Get(url)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != 200 {
+			return errors.Errorf("Unable to download image: %s", url)
+		}
+		file, err := os.Create(filepath.Join(dir, fmt.Sprintf("image_%d", i)))
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		//Write the bytes to the fiel
+		_, err = io.Copy(file, response.Body)
+		if err != nil {
+			return errors.Wrap(err, "unable to copy file")
+		}
+	}
+
+	return err
 }
