@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"oikotie/scraper"
+	"oikotie/tg"
 
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,7 @@ var updateCmd = &cobra.Command{
 
 		l, err := search.Run()
 		if err != nil {
+			_ = tg.ReportError(err)
 			log.Fatal(err)
 		} else {
 			log.Printf("Update successfull, created %d listings\n", len(l))

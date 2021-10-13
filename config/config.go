@@ -53,6 +53,14 @@ func (r *Reader) DatabaseURL() string {
 	return r.get("DATABASE_URL")
 }
 
+func (r *Reader) TgBotToken() string {
+	return r.get("TG_BOT_TOKEN")
+}
+
+func (r *Reader) TgChatID() string {
+	return r.get("TG_CHAT_ID")
+}
+
 func (r *Reader) SearchConfig() *SearchConfig {
 	if r.searchConfig == nil {
 		raw, err := ioutil.ReadFile(r.get("SEARCH_CONFIG_PATH"))

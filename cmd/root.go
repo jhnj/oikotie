@@ -46,7 +46,3 @@ func setup() DI {
 		db:  db,
 	}
 }
-
-// func init() {
-// 	rootCmd.AddCommand(updateCmd)
-// }
