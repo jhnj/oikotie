@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
 	"oikotie/scraper"
 	"oikotie/tg"
@@ -29,10 +30,17 @@ var updateCmd = &cobra.Command{
 
 		l, err := search.Run()
 		if err != nil {
-			_ = tg.ReportError(err)
+			msg := fmt.Sprintf("Oikotie scraper failed with error: %v", err)
+			_ = tg.SendMessage(di.cfg, msg)
 			log.Fatal(err)
 		} else {
-			log.Printf("Update successfull, created %d listings\n", len(l))
+			msg := fmt.Sprintf("Update successfull, created %d listings\n", len(l))
+			err := tg.SendMessage(di.cfg, msg)
+			if err != nil {
+				log.Printf("SendMessage failed: %v", err)
+			}
+
+			log.Print(msg)
 		}
 	},
 }

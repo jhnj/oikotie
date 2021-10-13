@@ -11,13 +11,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func ReportError(err error) error {
-	msg := fmt.Sprintf("oikotie scraper failed with error: %v", err)
-
-	cfg, err := config.NewReader()
-	if err != nil {
-		return err
-	}
+func SendMessage(cfg *config.Reader, msg string) error {
 	return send(cfg.TgBotToken(), cfg.TgChatID(), msg)
 }
 
