@@ -277,7 +277,7 @@ func (s *Scraper) getListings(area *models.Area) ([]*models.Listing, error) {
 		return nil, err
 	}
 
-	for _, apiListing := range listingsResponse.Cards[:3] {
+	for _, apiListing := range listingsResponse.Cards {
 		listing := &models.Listing{}
 
 		err = listing.ListingData.Marshal(apiListing)
